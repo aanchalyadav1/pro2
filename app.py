@@ -1,4 +1,3 @@
-
 import streamlit as st
 from deepface import DeepFace
 import cv2
@@ -6,69 +5,58 @@ import numpy as np
 from PIL import Image
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-import time
 
-# Spotify setup
+# ------------------ SPOTIFY SETUP ------------------
 client_id = st.secrets["spotify"]["client_id"]
 client_secret = st.secrets["spotify"]["client_secret"]
 auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-# App UI
-st.set_page_config(page_title="Moodify Music", page_icon="🎵")
-st.title("🎵 Moodify Music Recommendations (Live Webcam)")
-st.write("Look into your webcam and get music recommendations based on your mood!")
+# ------------------ UI SETUP ------------------
+st.set_page_config(page_title="Moodify Music", page_icon="🎵", layout="centered")
+st.title("🎵 Moodify Music Recommendations (Based on Your Mood)")
+st.write("Upload a selfie or any image of a face, and get music recommendations based on detected emotion!")
 
-# Webcam capture
-run = st.checkbox("Start Webcam")
-FRAME_WINDOW = st.image([])
-emotion_display = st.empty()
-last_analysis_time = 0
-emotion_detected = None
-ANALYSIS_INTERVAL = 3  # seconds
+uploaded_file = st.file_uploader("📸 Upload an image", type=["jpg", "jpeg", "png"])
 
-cap = cv2.VideoCapture(0)
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    rgb_image = np.array(image)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
 
-while run:
-    ret, frame = cap.read()
-    if not ret:
-        st.error("Failed to access webcam.")
-        break
-
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    FRAME_WINDOW.image(rgb_frame)
-
-    current_time = time.time()
-    if current_time - last_analysis_time > ANALYSIS_INTERVAL:
+    with st.spinner("Analyzing emotion..."):
         try:
-            result = DeepFace.analyze(rgb_frame, actions=['emotion'], enforce_detection=False)
-            emotion_detected = result['dominant_emotion']
-            emotion_display.markdown(f"### Detected Emotion: **{emotion_detected.capitalize()}**")
-            last_analysis_time = current_time
-        except:
-            emotion_display.warning("Unable to detect emotion.")
+            result = DeepFace.analyze(rgb_image, actions=['emotion'], enforce_detection=False)
+            emotion_detected = result[0]['dominant_emotion']
+            st.success(f"**Detected Emotion:** {emotion_detected.capitalize()}")
+        except Exception as e:
+            st.error(f"Emotion detection failed: {e}")
+            emotion_detected = None
 
-    if st.button("Get Music Recommendations"):
-        if emotion_detected:
-            emotion_to_genre = {
-                "happy": "pop",
-                "sad": "acoustic",
-                "angry": "metal",
-                "surprise": "edm",
-                "fear": "ambient",
-                "disgust": "punk",
-                "neutral": "lofi"
-            }
-            genre = emotion_to_genre.get(emotion_detected, "pop")
+    if emotion_detected:
+        # Map emotion to genre
+        emotion_to_genre = {
+            "happy": "pop",
+            "sad": "acoustic",
+            "angry": "metal",
+            "surprise": "edm",
+            "fear": "ambient",
+            "disgust": "punk",
+            "neutral": "lofi"
+        }
+
+        genre = emotion_to_genre.get(emotion_detected.lower(), "pop")
+
+        st.subheader(f"🎶 Music Recommendations for {emotion_detected.capitalize()} mood:")
+
+        try:
             results = sp.search(q=f"genre:{genre}", type="track", limit=5)
-
-            st.subheader("🎶 Recommended Tracks:")
             for idx, track in enumerate(results['tracks']['items'], 1):
                 track_name = track['name']
                 artist_name = track['artists'][0]['name']
                 spotify_url = track['external_urls']['spotify']
                 st.write(f"{idx}. [{track_name} by {artist_name}]({spotify_url})")
-        else:
-            st.warning("Emotion not detected yet. Please look at the camera.")
-
-cap.release()
+        except Exception as e:
+            st.error(f"Spotify error: {e}")
+else:
+    st.info("👆 Upload an image to get started!")
