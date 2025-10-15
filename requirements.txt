@@ -1,7 +1,10 @@
-
-streamlit
-deepface
-opencv-python-headless
-spotipy
-Pillow
-numpy
+streamlit==1.39.0
+deepface==0.0.93
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+pandas==2.2.2
+tensorflow==2.15.0
+keras==2.15.0
+pillow==10.4.0
+spotipy==2.23.0
+python-dotenv==1.0.1
